@@ -1,0 +1,15 @@
+http:
+  routers:
+    default-router:
+      rule: "HostRegexp(`{subdomain:[a-z]+}.men.pharmacyyours.com`)"
+      service: "default-service"
+      entryPoints:
+        - "websecure"
+      tls:
+        certresolver: "main-resolver"
+
+  services:
+    default-service:
+      loadbalancer:
+        servers:
+          - url: "http://default:8000"

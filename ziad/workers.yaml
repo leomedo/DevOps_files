@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe-queue-long
+  namespace: frappe-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frappe-queue-long
+  template:
+    metadata:
+      labels:
+        app: frappe-queue-long
+    spec:
+      initContainers:
+      - name: wait-for-configurator
+        image: busybox
+        command: ['sh', '-c', 'until kubectl get job frappe-configurator -n frappe-men -o jsonpath="{.status.succeeded}" | grep 1; do echo waiting for configurator; sleep 2; done']
+      containers:
+      - name: queue-long
+        image: docker.io/library/frappe-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - bench
+        - worker
+        - --queue
+        - long,default,short
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        envFrom:
+        - configMapRef:
+            name: frappe-config
+        - secretRef:
+            name: frappe-secrets
+        volumeMounts:
+        - name: sites-data
+          mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+      - name: sites-data
+        persistentVolumeClaim:
+          claimName: frappe-sites-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe-queue-short
+  namespace: frappe-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frappe-queue-short
+  template:
+    metadata:
+      labels:
+        app: frappe-queue-short
+    spec:
+      initContainers:
+      - name: wait-for-configurator
+        image: busybox
+        command: ['sh', '-c', 'until kubectl get job frappe-configurator -n frappe-men -o jsonpath="{.status.succeeded}" | grep 1; do echo waiting for configurator; sleep 2; done']
+      containers:
+      - name: queue-short
+        image: docker.io/library/frappe-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - bench
+        - worker
+        - --queue
+        - short,default
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        envFrom:
+        - configMapRef:
+            name: frappe-config
+        - secretRef:
+            name: frappe-secrets
+        volumeMounts:
+        - name: sites-data
+          mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+      - name: sites-data
+        persistentVolumeClaim:
+          claimName: frappe-sites-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe-scheduler
+  namespace: frappe-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frappe-scheduler
+  template:
+    metadata:
+      labels:
+        app: frappe-scheduler
+    spec:
+      initContainers:
+      - name: wait-for-configurator
+        image: busybox
+        command: ['sh', '-c', 'until kubectl get job frappe-configurator -n frappe-men -o jsonpath="{.status.succeeded}" | grep 1; do echo waiting for configurator; sleep 2; done']
+      containers:
+      - name: scheduler
+        image: docker.io/library/frappe-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - bench
+        - schedule
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        envFrom:
+        - configMapRef:
+            name: frappe-config
+        - secretRef:
+            name: frappe-secrets
+        volumeMounts:
+        - name: sites-data
+          mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+      - name: sites-data
+        persistentVolumeClaim:
+          claimName: frappe-sites-pvc

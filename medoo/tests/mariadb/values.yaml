@@ -1,0 +1,19 @@
+architecture: standalone
+auth:
+  rootPassword: "admin"
+  database: my_database
+  username: "my_database"
+  password: "admin"
+  replicationUser: replicator
+  replicationPassword: "admin"
+
+primary:
+  extraFlags: >-
+    --skip-character-set-client-handshake
+    --skip-innodb-read-only-compressed
+    --character-set-server=utf8mb4
+    --collation-server=utf8mb4_unicode_ci
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path

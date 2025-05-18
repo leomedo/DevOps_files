@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe-frontend
+  namespace: frappe-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frappe-frontend
+  template:
+    metadata:
+      labels:
+        app: frappe-frontend
+    spec:
+      initContainers:
+      - name: wait-for-backend
+        image: busybox
+        command: ['sh', '-c', 'until nslookup frappe-backend.frappe-men.svc.cluster.local; do echo waiting for backend; sleep 2; done']
+      - name: wait-for-websocket
+        image: busybox
+        command: ['sh', '-c', 'until nslookup frappe-websocket.frappe-men.svc.cluster.local; do echo waiting for websocket; sleep 2; done']
+      containers:
+      - name: frontend
+        image: docker.io/library/frappe-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - nginx-entrypoint.sh
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        env:
+        - name: BACKEND
+          value: "frappe-backend:8000"
+        - name: SOCKETIO
+          value: "frappe-websocket:9000"
+        envFrom:
+        - configMapRef:
+            name: frappe-config
+        - secretRef:
+            name: frappe-secrets
+        volumeMounts:
+        - name: sites-data
+          mountPath: /home/frappe/frappe-bench/sites
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: sites-data
+        persistentVolumeClaim:
+          claimName: frappe-sites-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frappe-frontend
+  namespace: frappe-men
+spec:
+  selector:
+    app: frappe-frontend
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP

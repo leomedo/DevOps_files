@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: frappe-configurator
+  namespace: frappe-men
+spec:
+  template:
+    spec:
+      containers:
+      - name: configurator
+        image: docker.io/library/frappe-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - bash
+        - -c
+        - |
+          ls -1 apps > sites/apps.txt; 
+          bench set-config -g db_host $DB_HOST; 
+          bench set-config -gp db_port $DB_PORT; 
+          bench set-config -g redis_cache "redis://$REDIS_CACHE"; 
+          bench set-config -g redis_queue "redis://$REDIS_QUEUE"; 
+          bench set-config -g redis_socketio "redis://$REDIS_QUEUE"; 
+          bench set-config -gp socketio_port $SOCKETIO_PORT;
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        envFrom:
+        - configMapRef:
+            name: frappe-config
+        - secretRef:
+            name: frappe-secrets
+        volumeMounts:
+        - name: sites-data
+          mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+      - name: sites-data
+        persistentVolumeClaim:
+          claimName: frappe-sites-pvc
+      restartPolicy: OnFailure

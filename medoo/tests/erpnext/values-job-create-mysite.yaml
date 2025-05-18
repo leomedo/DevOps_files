@@ -1,0 +1,11 @@
+jobs:
+  createSite:
+    enabled: true
+    forceCreate: true
+    siteName: "men.appyinfo.com"
+    installApps:
+      - frappe
+      - erpnext
+      - zatca
+      
+    adminPassword: "admin"

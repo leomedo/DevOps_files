@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sites-men-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany  # تغيير من RWO إلى RWX للسماح بمشاركة الـ PVC بين الـ Pods
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sites-men"

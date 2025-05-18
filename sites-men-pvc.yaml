@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sites-men-pvc
+  namespace: zatca-men
+spec:
+  accessModes:
+    - ReadWriteMany  # Ensure this matches the Persistent Volume
+  resources:
+    requests:
+      storage: 10Gi  # Adjust size as needed
+  storageClassName: manual  # Must match the PV's storageClass

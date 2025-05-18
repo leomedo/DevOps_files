@@ -1,0 +1,479 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zatca-men
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: zatca-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: frappe-app:latest
+        imagePullPolicy: Never
+        env:
+        - name: ENCRYPTION_KEY
+          value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123"
+        - name: ADMIN_PASSWORD
+          value: "admin"
+        - name: SITE_DOMAIN
+          value: "men.appyinfo.com"
+        volumeMounts:
+        - name: sites-storage
+          mountPath: /home/frappe/frappe-bench/sites
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "500Mi"
+          requests:
+            cpu: "500m"
+            memory: "500Mi"
+      volumes:
+      - name: sites-storage
+        persistentVolumeClaim:
+          claimName: sites-men-pvc
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configurator
+  namespace: zatca-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: configurator
+  template:
+    metadata:
+      labels:
+        app: configurator
+    spec:
+      containers:
+      - name: configurator
+        image: frappe-app:latest
+        imagePullPolicy: Never
+        command:
+        - "/bin/bash"
+        - "-c"
+        - |
+          ls -1 apps > sites/apps.txt;
+          bench set-config -g db_host $DB_HOST;
+          bench set-config -gp db_port $DB_PORT;
+          bench set-config -g redis_cache "redis://$REDIS_CACHE";
+          bench set-config -g redis_queue "redis://$REDIS_QUEUE";
+          bench set-config -g redis_socketio "redis://$REDIS_QUEUE";
+          bench set-config -gp socketio_port $SOCKETIO_PORT;
+        env:
+        - name: DB_HOST
+          value: "db"
+        - name: DB_PORT
+          value: "3306"
+        - name: REDIS_CACHE
+          value: "redis-cache:6379"
+        - name: REDIS_QUEUE
+          value: "redis-queue:6379"
+        - name: SOCKETIO_PORT
+          value: "9000"
+        - name: ENCRYPTION_KEY
+          value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123"
+        - name: ADMIN_PASSWORD
+          value: "admin"
+        - name: SITE_DOMAIN
+          value: "men.appyinfo.com"
+        volumeMounts:
+        - name: sites-storage
+          mountPath: /home/frappe/frappe-bench/sites
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "500Mi"
+          requests:
+            cpu: "500m"
+            memory: "500Mi"
+      volumes:
+      - name: sites-storage
+        persistentVolumeClaim:
+          claimName: sites-men-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: zatca-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: db
+          image: mariadb:10.6
+          args:
+            - "--character-set-server=utf8mb4"
+            - "--collation-server=utf8mb4_unicode_ci"
+            - "--skip-character-set-client-handshake"
+            - "--skip-innodb-read-only-compressed"
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123"
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: db-volume
+              mountPath: /var/lib/mysql
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+            requests:
+              cpu: "500m"
+              memory: "500Mi"
+      volumes:
+        - name: db-volume
+          persistentVolumeClaim:
+            claimName: sites-men-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: zatca-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: frappe-app:latest
+          imagePullPolicy: Never
+          command: ["nginx-entrypoint.sh"]
+          env:
+            - name: BACKEND
+              value: "backend:8000"
+            - name: CLIENT_MAX_BODY_SIZE
+              value: "50m"
+            - name: FRAPPE_SITE_NAME_HEADER
+              value: "$$host"
+            - name: PROXY_READ_TIMEOUT
+              value: "120"
+            - name: SOCKETIO
+              value: "websocket:9000"
+            - name: UPSTREAM_REAL_IP_ADDRESS
+              value: "93.190.141.128"
+            - name: UPSTREAM_REAL_IP_HEADER
+              value: "X-Forwarded-For"
+            - name: UPSTREAM_REAL_IP_RECURSIVE
+              value: "off"
+            - name: ENCRYPTION_KEY
+              value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123"
+            - name: ADMIN_PASSWORD
+              value: "admin"
+            - name: SITE_DOMAIN
+              value: "men.appyinfo.com"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: sites-volume
+              mountPath: /home/frappe/frappe-bench/sites
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+            requests:
+              cpu: "500m"
+              memory: "500Mi"
+      volumes:
+        - name: sites-volume
+          persistentVolumeClaim:
+            claimName: sites-men-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-long
+  namespace: zatca-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: queue-long
+  template:
+    metadata:
+      labels:
+        app: queue-long
+    spec:
+      containers:
+        - name: queue-long
+          image: frappe-app:latest
+          imagePullPolicy: Never
+          command: ["bench", "worker", "--queue", "long,default,short"]
+          env:
+            - name: ENCRYPTION_KEY
+              value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123"
+            - name: ADMIN_PASSWORD
+              value: "admin"
+            - name: SITE_DOMAIN
+              value: "men.appyinfo.com"
+          volumeMounts:
+            - name: sites-volume
+              mountPath: /home/frappe/frappe-bench/sites
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+            requests:
+              cpu: "500m"
+              memory: "500Mi"
+      volumes:
+        - name: sites-volume
+          persistentVolumeClaim:
+            claimName: sites-men-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-short
+  namespace: zatca-men
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: queue-short
+  template:
+    metadata:
+      labels:
+        app: queue-short
+    spec:
+      containers:
+        - name: queue-short
+          image: frappe-app:latest
+          imagePullPolicy: Never
+          command: ["bench", "worker", "--queue", "short,default"]
+          env:
+            - name: ENCRYPTION_KEY
+              value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123"
+            - name: ADMIN_PASSWORD
+              value: "admin"
+            - name: SITE_DOMAIN
+              value: "men.appyinfo.com"
+          volumeMounts:
+            - name: sites-volume
+              mountPath: /home/frappe/frappe-bench/sites
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+            requests:
+              cpu: "500m"
+              memory: "500Mi"
+      volumes:
+        - name: sites-volume
+          persistentVolumeClaim:
+            claimName: sites-men-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-cache
+  template:
+    metadata:
+      labels:
+        app: redis-cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:6.2-alpine
+          volumeMounts:
+            - name: redis-cache-storage
+              mountPath: /data
+      volumes:
+        - name: redis-cache-storage
+          persistentVolumeClaim:
+            claimName: redis-cache-data-men
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: zatca-men
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cache
+spec:
+  selector:
+    app: redis-cache
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-queue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-queue
+  template:
+    metadata:
+      labels:
+        app: redis-queue
+    spec:
+      containers:
+        - name: redis
+          image: redis:6.2-alpine
+          volumeMounts:
+            - name: redis-queue-storage
+              mountPath: /data
+      volumes:
+        - name: redis-queue-storage
+          persistentVolumeClaim:
+            claimName: redis-queue-data-men
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-queue
+spec:
+  selector:
+    app: redis-queue
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: frappe-app:latest
+          imagePullPolicy: Never
+          command: ["bench", "schedule"]
+          env:
+            - name: ENCRYPTION_KEY
+              value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123"
+            - name: ADMIN_PASSWORD
+              value: "admin"
+            - name: SITE_DOMAIN
+              value: "men.appyinfo.com"
+          volumeMounts:
+            - name: sites-storage
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites-storage
+          persistentVolumeClaim:
+            claimName: ssites-men-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: websocket
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: websocket
+  template:
+    metadata:
+      labels:
+        app: websocket
+    spec:
+      containers:
+        - name: websocket
+          image: frappe-app:latest
+          imagePullPolicy: Never
+          command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+          env:
+            - name: ENCRYPTION_KEY
+              value: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+            - name: MYSQL_ROOT_PASSWORD
+              value: "123"
+            - name: ADMIN_PASSWORD
+              value: "admin"
+            - name: SITE_DOMAIN
+              value: "men.appyinfo.com"
+          volumeMounts:
+            - name: sites-storage
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites-storage
+          persistentVolumeClaim:
+            claimName: sites-men-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sites-men-pvc
+  namespace: zatca-men
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: manual

@@ -1,0 +1,52 @@
+# Using k3s built-in local-path provisioner
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: frappe-sites-pvc
+  namespace: frappe-men
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: frappe-db-pvc
+  namespace: frappe-men
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: frappe-redis-cache-pvc
+  namespace: frappe-men
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: frappe-redis-queue-pvc
+  namespace: frappe-men
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,306 @@
+name: zatca-men
+services:
+  backend:
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    image: frappe-app:latest
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+
+  configurator:
+    command:
+      - |
+        ls -1 apps > sites/apps.txt; 
+        bench set-config -g db_host $$DB_HOST; 
+        bench set-config -gp db_port $$DB_PORT; 
+        bench set-config -g redis_cache "redis://$$REDIS_CACHE"; 
+        bench set-config -g redis_queue "redis://$$REDIS_QUEUE"; 
+        bench set-config -g redis_socketio "redis://$$REDIS_QUEUE"; 
+        bench set-config -gp socketio_port $$SOCKETIO_PORT;
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+    entrypoint:
+      - bash
+      - -c
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      REDIS_CACHE: redis-cache:6379
+      REDIS_QUEUE: redis-queue:6379
+      SOCKETIO_PORT: "9000"
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+    image: frappe-app:latest
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+
+  db:
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: 1jmgqtQHm9nkklOH
+    # ports:
+      # - '3306:3306'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h localhost --password=1jmgqtQHm9nkklOH
+      interval: 1s
+      retries: 15
+    image: mariadb:10.6
+    networks:
+      - appy-men
+    volumes:
+      - type: volume
+        source: db-data-men
+        target: /var/lib/mysql
+        volume: {}
+
+  frontend:
+    image: frappe-app:latest
+    command:
+      - nginx-entrypoint.sh
+    # command: ["nginx", "-g", "daemon off;"]
+    depends_on:
+      backend:
+        condition: service_started
+      websocket:
+        condition: service_started
+    environment:
+      BACKEND: backend:8000
+      CLIENT_MAX_BODY_SIZE: 50m
+      FRAPPE_SITE_NAME_HEADER: $$host
+      PROXY_READ_TIMEOUT: "120"
+      SOCKETIO: websocket:9000
+      UPSTREAM_REAL_IP_ADDRESS: 185.132.177.173
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+    ports:
+      - '2743:8080'
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+
+
+  queue-long:
+    command:
+      - bench
+      - worker
+      - --queue
+      - long,default,short
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    image: frappe-app:latest
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+
+  queue-short:
+    command:
+      - bench
+      - worker
+      - --queue
+      - short,default
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    image: frappe-app:latest
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+
+  redis-cache:
+    image: redis:6.2-alpine
+    networks:
+      - appy-men
+    volumes:
+      - type: volume
+        source: redis-cache-data-men
+        target: /data
+        volume: {}
+
+  redis-queue:
+    image: redis:6.2-alpine
+    networks:
+      - appy-men
+    volumes:
+      - type: volume
+        source: redis-queue-data-men
+        target: /data
+        volume: {}
+
+  scheduler:
+    command:
+      - bench
+      - schedule
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    image: frappe-app:latest
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+
+  websocket:
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    image: frappe-app:latest
+    networks:
+      - appy-men
+    platform: linux/amd64
+    # pull_policy: always
+    volumes:
+      - type: volume
+        source: sites-men
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      # - type: volume
+      #   source: apps-men
+      #   target: /home/frappe/frappe-bench/apps
+      #   volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "1jmgqtQHm9nkklOH"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appyerp.net"
+
+networks:
+  appy-men:
+    external: true
+    name: serverproxynet55
+
+
+volumes:
+  cert-data-men:
+    name: cert-data-men
+  db-data-men:
+    name: db-data-men
+  redis-cache-data-men:
+    name: redis-cache-data-men
+  redis-queue-data-men:
+    name: redis-queue-data-men
+  sites-men:
+    name: sites-men
+  # apps-men:
+  #   name: apps-men
+
+x-backend-defaults:
+  depends_on:
+    configurator:
+      condition: service_completed_successfully
+  image: frappe-app:latest
+  # pull_policy: always
+  volumes:
+    - sites-men:/home/frappe/frappe-bench/sites
+    # - apps-men:/home/frappe/frappe-bench/apps
+
+x-customizable-image:
+  image: frappe-app:latest
+  # pull_policy: always
+
+x-depends-on-configurator:
+  depends_on:
+    configurator:
+      condition: service_completed_successfully

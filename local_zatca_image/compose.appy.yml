@@ -1,0 +1,348 @@
+name: zatca
+
+services:
+  backend:
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    container_name: backend
+    image: frappe/erpnext:v15.50.0
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    deploy:
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+
+
+  configurator:
+    command:
+      - |
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host $$DB_HOST; 
+        bench set-config -gp db_port $$DB_PORT; 
+        bench set-config -g redis_cache "redis://$$REDIS_CACHE"; 
+        bench set-config -g redis_queue "redis://$$REDIS_QUEUE"; 
+        bench set-config -g redis_socketio "redis://$$REDIS_QUEUE"; 
+        bench set-config -gp socketio_port $$SOCKETIO_PORT;
+    container_name: configurator
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+    entrypoint:
+      - bash
+      - -c
+    deploy:
+      restart_policy:
+        condition: none
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      REDIS_CACHE: redis-cache:6379
+      REDIS_QUEUE: redis-queue:6379
+      SOCKETIO_PORT: "9000"
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+    image: frappe/erpnext:v15.50.0
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+
+  db:
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    container_name: zatca-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 123
+    deploy:
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h localhost --password=123
+      interval: 1s
+      retries: 15
+    image: mariadb:10.6
+    networks:
+      - zatca-net
+    volumes:
+      - type: volume
+        source: db-data
+        target: /var/lib/mysql
+        volume: {}
+
+
+  frontend:
+    image: frappe/erpnext:v15.50.0
+    command:
+      - nginx-entrypoint.sh
+    container_name: frontend
+    depends_on:
+      backend:
+        condition: service_started
+      websocket:
+        condition: service_started
+    environment:
+      BACKEND: backend:8000
+      CLIENT_MAX_BODY_SIZE: 50m
+      FRAPPE_SITE_NAME_HEADER: $$host
+      PROXY_READ_TIMEOUT: "120"
+      SOCKETIO: websocket:9000
+      UPSTREAM_REAL_IP_ADDRESS: 190.2.142.59
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+    deploy:
+      restart_policy:
+        condition: on-failure
+    ports:
+      - '2458:8080'
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+
+
+  queue-long:
+    command:
+      - bench
+      - worker
+      - --queue
+      - long,default,short
+    container_name: queue-long
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    deploy:
+      restart_policy:
+        condition: on-failure
+    image: frappe/erpnext:v15.50.0
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+
+
+  queue-short:
+    command:
+      - bench
+      - worker
+      - --queue
+      - short,default
+    container_name: queue-short
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    deploy:
+      restart_policy:
+        condition: on-failure
+    image: frappe/erpnext:v15.50.0
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+
+
+  redis-cache:
+    image: redis:6.2-alpine
+    container_name: redis_cache
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - zatca-net
+    volumes:
+      - type: volume
+        source: redis-cache-data
+        target: /data
+        volume: {}
+
+
+  redis-queue:
+    image: redis:6.2-alpine
+    container_name: redis_queue
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - zatca-net
+    volumes:
+      - type: volume
+        source: redis-queue-data
+        target: /data
+        volume: {}
+
+
+  scheduler:
+    command:
+      - bench
+      - schedule
+    container_name: scheduler
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    image: frappe/erpnext:v15.50.0
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+
+
+  websocket:
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
+    container_name: websocket
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    deploy:
+      restart_policy:
+        condition: on-failure
+    image: frappe/erpnext:v15.50.0
+    networks:
+      - zatca-net
+    platform: linux/amd64
+    volumes:
+      - type: volume
+        source: sites
+        target: /home/frappe/frappe-bench/sites
+        volume: {}
+      - type: volume
+        source: apps
+        target: /home/frappe/frappe-bench/apps
+        volume: {}
+    environment:
+      ENCRYPTION_KEY: "LmQeNCZFF5hhJw_pi19viiETta2qKHV6YF_Av4nwhqM="
+      MYSQL_ROOT_PASSWORD: "123"
+      ADMIN_PASSWORD: "admin"
+      SITE_DOMAIN: "appy.pharmacyyours.com"
+      PYTHONPATH: "/home/frappe/frappe-bench/apps:/usr/lib/python3.11:/usr/local/lib/python3.11"
+
+
+networks:
+  zatca-net:
+    external:
+      name: serverproxynet3
+
+
+volumes:
+  db-data:
+    name: db-data
+  redis-cache-data:
+    name: redis-cache-data
+  redis-queue-data:
+    name: redis-queue-data
+  sites:
+    name: sites
+  apps:
+    name: apps
+
+x-backend-defaults:
+  depends_on:
+    configurator:
+      condition: service_completed_successfully
+  image: frappe/erpnext:v15.50.0
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - apps:/home/frappe/frappe-bench/apps
+
+x-customizable-image:
+  image: frappe/erpnext:v15.50.0
+
+x-depends-on-configurator:
+  depends_on:
+    configurator:
+      condition: service_completed_successfully

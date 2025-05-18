@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sites-men-pvc
+  namespace: zatca-men
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: manual  # مهم لضمان تطابق PVC مع PV
+  volumeName: sites-men-pv  # ربط الـ PVC بالـ PV مباشرة

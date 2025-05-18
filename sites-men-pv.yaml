@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sites-men-pv
+spec:
+  capacity:
+    storage: 10Gi  # Ensure this matches the PVC request
+  accessModes:
+    - ReadWriteMany  # Must match the PVC
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual  # Must match the PVC's storageClassName
+  hostPath:
+    path: "/mnt/data/sites-men"  # Change this to an existing directory on the node

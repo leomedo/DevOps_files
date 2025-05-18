@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frappe-config
+  namespace: frappe-men
+data:
+  DB_HOST: "frappe-db"
+  DB_PORT: "3306"
+  REDIS_CACHE: "frappe-redis-cache:6379"
+  REDIS_QUEUE: "frappe-redis-queue:6379"
+  SOCKETIO_PORT: "9000"
+  SITE_DOMAIN: "men.appyinfo.com"
+  FRAPPE_SITE_NAME_HEADER: "$host"
+  CLIENT_MAX_BODY_SIZE: "50m"
+  PROXY_READ_TIMEOUT: "120"
+  UPSTREAM_REAL_IP_ADDRESS: "93.190.141.128"
+  UPSTREAM_REAL_IP_HEADER: "X-Forwarded-For"
+  UPSTREAM_REAL_IP_RECURSIVE: "off"

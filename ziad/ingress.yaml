@@ -1,0 +1,57 @@
+# Using Traefik IngressRoute which is native to k3s
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: frappe-ingress
+  namespace: frappe-men
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`men.appyinfo.com`) && PathPrefix(`/socket.io`)
+      kind: Rule
+      services:
+        - name: frappe-websocket
+          port: 9000
+    - match: Host(`men.appyinfo.com`)
+      kind: Rule
+      services:
+        - name: frappe-frontend
+          port: 8080
+  tls:
+    certResolver: le
+---
+# Also create a standard Kubernetes Ingress for cert-manager
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frappe-ingress-cert
+  namespace: frappe-men
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+  - hosts:
+    - men.appyinfo.com
+    secretName: frappe-tls
+  rules:
+  - host: men.appyinfo.com
+    http:
+      paths:
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: frappe-websocket
+            port:
+              number: 9000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frappe-frontend
+            port:
+              number: 8080
