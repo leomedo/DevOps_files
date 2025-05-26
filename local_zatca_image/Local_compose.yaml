@@ -1,4 +1,3 @@
-cat compose.yml
 name: zatca
 services:
   backend:
